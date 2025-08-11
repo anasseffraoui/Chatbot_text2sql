@@ -1,0 +1,45 @@
+# --- Python / FastAPI ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# virtual envs
+env/
+venv/
+.venv/
+ENV/
+pip-wheel-metadata/
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Environment & secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Logs & temp
+logs/
+*.log
+tmp/
+temp/
+
+# App exports (downloads)
+exports/
+*.xlsx
+
+# Node leftovers (if any from experiments)
+node_modules/

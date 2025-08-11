@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Text2SQL — Query Console</title>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    :root {
+      --bg:#f2f5fb;
+      --ink:#0d1324;
+      --muted:#54607a;
+      --card:#ffffff;
+      --line:#dfe5f2;
+      --brand:#0b80ee;
+      --input:#f7f9fe;
+      --input-border:#cfd7e8;
+      --sql-bg:#0b1020;
+      --sql-fg:#e7f0ff;
+      --err-bg:#fee; --err-border:#fcc; --err-ink:#7a1b24;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#0b1020;
+        --ink:#e9eefb;
+        --muted:#9aa3b8;
+        --card:#131a2e;
+        --line:#26304a;
+        --brand:#60a5fa;
+        --input:#1b2540;
+        --input-border:#334064;
+        --sql-bg:#0b1020;
+        --sql-fg:#e7f0ff;
+        --err-bg:#3a1013; --err-border:#6b1f28; --err-ink:#ffb2ba;
+      }
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .wrap{max-width:1000px;margin:28px auto;padding:0 16px}
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand .logo{width:28px;height:28px;border-radius:8px;background:conic-gradient(from 180deg at 50% 50%, #0ea5e9, #6366f1, #22c55e, #0ea5e9);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+    .brand h1{font-size:18px;margin:0}
+    .note{font-size:12px;color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 24px rgba(2,6,23,.06);padding:16px}
+    .row{display:grid;gap:12px}
+    @media(min-width:900px){ .row-3{grid-template-columns:2fr 1fr 140px} }
+    label{font-size:12px;color:var(--muted);display:block;margin:0 0 6px}
+    textarea,input[type=number],input[type=text]{width:100%;padding:11px 12px;border:1px solid var(--input-border);border-radius:12px;background:var(--input);color:var(--ink);font:inherit;outline:0}
+    textarea{min-height:96px;resize:vertical}
+    ::placeholder{color:var(--muted);opacity:.9}
+    .controls{display:flex;gap:12px;align-items:center;justify-content:flex-end}
+    .btn{cursor:pointer;display:inline-flex;align-items:center;gap:10px;border:0;border-radius:12px;background:var(--brand);color:white;padding:10px 14px;font-weight:600}
+    .btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .error{background:var(--err-bg);border:1px solid var(--err-border);color:var(--err-ink);padding:10px 12px;border-radius:12px;display:none}
+    .sql{background:var(--sql-bg);color:var(--sql-fg);border-radius:12px;padding:12px;overflow:auto;white-space:pre-wrap}
+    .sqlbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .result{display:grid;gap:12px;margin-top:16px}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{border-bottom:1px solid var(--line);text-align:left;padding:8px 10px}
+    thead th{background:#eef3ff}
+    @media (prefers-color-scheme: dark){ thead th{background:#1b2540} }
+    .bigval{font-size:32px;font-weight:800;letter-spacing:.2px}
+    .grid2{display:grid;gap:12px}
+    @media(min-width:820px){ .grid2{grid-template-columns:1fr 1fr} }
+    .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:8px 10px;border-radius:10px;text-decoration:none;color:inherit;background:var(--card)}
+    .hidden{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <h1>Text2SQL — Query Console</h1>
+      </div>
+      <div class="note">Backend: <code>same origin</code></div>
+    </div>
+
+    <div class="card row row-3">
+      <div>
+        <label for="q">Natural-language question</label>
+        <textarea id="q" name="q" placeholder="Ask in natural language…"></textarea>
+      </div>
+      <div>
+        <label for="rows">Max preview rows</label>
+        <input id="rows" type="number" min="1" value="10"/>
+        <div style="margin-top:8px">
+          <label><input id="showsql" type="checkbox" checked/> Show SQL</label>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="run" class="btn" type="button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 3 14 9-14 9V3Z"/></svg>
+          Run
+        </button>
+      </div>
+      <div id="err" class="error"></div>
+    </div>
+
+    <section id="out" class="result hidden">
+      <div id="sqlbox" class="card hidden">
+        <div class="sqlbar">
+          <strong>Generated SQL</strong>
+          <div class="controls">
+            <button id="copy" class="btn secondary" type="button">Copy SQL</button>
+          </div>
+        </div>
+        <pre id="sql" class="sql"></pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <strong id="resTitle">Preview</strong>
+            <a id="download" class="badge hidden" href="#" download>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              Download
+            </a>
+          </div>
+          <div id="tablewrap"></div>
+          <div id="singlewrap" class="hidden">
+            <div class="bigval" id="singleval">—</div>
+          </div>
+        </div>
+
+        <div id="warns" class="card hidden"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const q = document.getElementById('q');
+    const rowsInput = document.getElementById('rows');
+    const showsql = document.getElementById('showsql');
+    const runBtn = document.getElementById('run');
+    const errBox = document.getElementById('err');
+    const out = document.getElementById('out');
+    const sqlbox = document.getElementById('sqlbox');
+    const sqlEl = document.getElementById('sql');
+    const copyBtn = document.getElementById('copy');
+    const resTitle = document.getElementById('resTitle');
+    const tablewrap = document.getElementById('tablewrap');
+    const singlewrap = document.getElementById('singlewrap');
+    const singleval = document.getElementById('singleval');
+    const downloadA = document.getElementById('download');
+    const warnsBox = document.getElementById('warns');
+
+    // No default question. Also ignore any ?q=... in URL to match your preference.
+
+    runBtn.addEventListener('click', runQuery);
+    copyBtn.addEventListener('click', () => {
+      const t = sqlEl.textContent || '';
+      navigator.clipboard.writeText(t);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy SQL'), 900);
+    });
+
+    async function runQuery(){
+      resetUI();
+      const question = q.value.trim();
+      const max_preview_rows = Math.max(1, parseInt(rowsInput.value || '10', 10));
+      const show_sql = !!showsql.checked;
+      if (question.length < 4) return showError('Question must be at least 4 characters.');
+
+      runBtn.disabled = true;
+      runBtn.innerHTML = spinner('Running…');
+      try {
+        const r = await fetch('/query', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ question, max_preview_rows, show_sql })
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+        const data = await r.json();
+        renderResult(data, show_sql);
+      } catch (err) {
+        showError(err.message || 'Request failed');
+      } finally {
+        runBtn.disabled = false;
+        runBtn.innerHTML = btnIcon('Run');
+      }
+    }
+
+    function renderResult(data, show_sql){
+      // SQL
+      if (data.sql && show_sql) {
+        sqlEl.textContent = data.sql;
+        sqlbox.classList.remove('hidden');
+      }
+
+      // Warnings
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        warnsBox.innerHTML = '<strong>Warnings</strong><ul style="margin:8px 0 0 18px">' + data.warnings.map(w => '<li>'+escapeHtml(String(w))+'</li>').join('') + '</ul>';
+        warnsBox.classList.remove('hidden');
+      }
+
+      // Download
+      if (data.download_token) {
+        downloadA.href = '/download/' + data.download_token;
+        downloadA.classList.remove('hidden');
+      }
+
+      // Result rendering
+      const cols = Array.isArray(data.columns) ? data.columns : [];
+      const rows = Array.isArray(data.preview_rows) ? data.preview_rows : [];
+
+      out.classList.remove('hidden');
+
+      // Single-cell value -> big number view
+      const singleCell = rows && rows.length === 1 && (cols.length === 1 || (rows[0] && rows[0].length === 1));
+      if (singleCell) {
+        const val = rows[0][0];
+        resTitle.textContent = 'Result';
+        tablewrap.innerHTML = '';
+        singleval.textContent = String(val);
+        singlewrap.classList.remove('hidden');
+      } else {
+        resTitle.textContent = `Preview (${rows.length} rows)`;
+        singlewrap.classList.add('hidden');
+        tablewrap.innerHTML = buildTable(cols, rows);
+      }
+    }
+
+    function buildTable(cols, rows){
+      if (!cols.length) return '<p class="note">No columns detected.</p>';
+      let html = '<div style="overflow:auto"><table><thead><tr>';
+      cols.forEach(c => (html += '<th>' + escapeHtml(String(c)) + '</th>'));
+      html += '</tr></thead><tbody>';
+      if (rows.length) {
+        rows.forEach(r => {
+          html += '<tr>';
+          for (let i = 0; i < cols.length; i++) {
+            const v = r?.[i] ?? '';
+            html += '<td>' + escapeHtml(String(v)) + '</td>';
+          }
+          html += '</tr>';
+        });
+      } else {
+        html += '<tr><td colspan="' + cols.length + '"><span class="note">No rows returned</span></td></tr>';
+      }
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function resetUI(){
+      errBox.style.display = 'none'; errBox.textContent = '';
+      out.classList.add('hidden');
+      sqlbox.classList.add('hidden');
+      downloadA.classList.add('hidden');
+      warnsBox.classList.add('hidden');
+      tablewrap.innerHTML = ''; singleval.textContent = '—';
+    }
+
+    function showError(msg){ errBox.textContent = msg; errBox.style.display = ''; }
+
+    function escapeHtml(s){
+      return s.replace(/[&<>'"]/g, function(c){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]);
+      });
+    }
+
+    function spinner(txt){
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>'+txt;
+    }
+    function btnIcon(txt){
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px"><path d="m7 3 14 9-14 9V3Z"/></svg>'+txt;
+    }
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+sqlalchemy
+pyodbc
+pandas
+openpyxl
+requests
+itsdangerous
