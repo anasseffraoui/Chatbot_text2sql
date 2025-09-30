@@ -9,6 +9,7 @@ app = FastAPI(title="Text2SQL API", version="0.1.0")
 app.mount("/ui", StaticFiles(directory="../web", html=True), name="ui")
 
 
+
 install_cors(app)
 app.include_router(health.router)
 app.include_router(query.router)
